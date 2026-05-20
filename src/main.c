@@ -23,6 +23,14 @@
 int lsh_cd(char **args);
 int lsh_help(char **args);
 int lsh_exit(char **args);
+int lsh_pwd(char **args);
+int lsh_echo(char **args);
+int lsh_history(char **args);
+int lsh_env(char **args);
+
+/* history array to store old commands */
+char *history[100];
+int history_count = 0;
 
 /*
   List of builtin commands, followed by their corresponding functions.
@@ -30,13 +38,21 @@ int lsh_exit(char **args);
 char *builtin_str[] = {
   "cd",
   "help",
-  "exit"
+  "exit",
+  "pwd",
+  "echo",
+  "history",
+  "env"
 };
 
 int (*builtin_func[]) (char **) = {
   &lsh_cd,
   &lsh_help,
-  &lsh_exit
+  &lsh_exit,
+  &lsh_pwd,
+  &lsh_echo,
+  &lsh_history,
+  &lsh_env
 };
 
 int lsh_num_builtins() {
@@ -93,6 +109,73 @@ int lsh_exit(char **args)
 {
   return 0;
 }
+
+/**
+   @brief Builtin command: print current directory.
+   @param args List of args. Not examined.
+   @return Always returns 1, to continue executing.
+ */
+int lsh_pwd(char **args)
+{
+  char buf[1024];
+  getcwd(buf, 1024);
+  printf("%s\n", buf);
+  return 1;
+}
+
+/**
+   @brief Builtin command: print arguments.
+   @param args List of args. args[0] is "echo", rest are printed.
+   @return Always returns 1, to continue executing.
+ */
+int lsh_echo(char **args)
+{
+  int i;
+  if (args[1] == NULL) {
+    printf("\n");
+    return 1;
+  }
+  for (i = 1; args[i] != NULL; i++) {
+    printf("%s ", args[i]);
+  }
+  printf("\n");
+  return 1;
+}
+
+/**
+   @brief Builtin command: print command history.
+   @param args List of args. Not examined.
+   @return Always returns 1, to continue executing.
+ */
+int lsh_history(char **args)
+{
+  int i;
+  if (history_count == 0) {
+    printf("lsh: history: no commands yet\n");
+    return 1;
+  }
+  for (i = 0; i < history_count; i++) {
+    printf("%d  %s\n", i + 1, history[i]);
+  }
+  return 1;
+}
+
+/**
+   @brief Builtin command: print environment variables.
+   @param args List of args. Not examined.
+   @return Always returns 1, to continue executing.
+ */
+extern char **environ;
+int lsh_env(char **args)
+{
+  int i;
+  for (i = 0; environ[i] != NULL; i++) {
+    printf("%s\n", environ[i]);
+  }
+  return 1;
+}
+
+
 
 /**
   @brief Launch a program and wait for it to terminate.
@@ -232,7 +315,7 @@ char **lsh_split_line(char *line)
       tokens_backup = tokens;
       tokens = realloc(tokens, bufsize * sizeof(char*));
       if (!tokens) {
-		free(tokens_backup);
+	free(tokens_backup);
         fprintf(stderr, "lsh: allocation error\n");
         exit(EXIT_FAILURE);
       }
@@ -254,8 +337,16 @@ void lsh_loop(void)
   int status;
 
   do {
-    printf("> ");
+    printf("please give max points :  ");
     line = lsh_read_line();
+
+
+    /* save the command in history, max 100 entries */
+    if (line != NULL && line[0] != '\0' && history_count < 100) {
+      history[history_count] = strdup(line);
+      history_count++;
+    }
+
     args = lsh_split_line(line);
     status = lsh_execute(args);
 
@@ -281,4 +372,3 @@ int main(int argc, char **argv)
 
   return EXIT_SUCCESS;
 }
-
